@@ -29,9 +29,9 @@ run_one(File) ->
 	ok.
 
 get_absolute_names(FileNames) ->
-	lists:foldl(fun(Name, Acc) -> [filename:absname("test/prolog/" ++ Name) | Acc] end, [], FileNames).
+	lists:foldl(fun(Name, Acc) -> [filename:absname("../test/auto/prolog/" ++ Name) | Acc] end, [], FileNames).
 
 -spec get_prolog_files() -> list().
 get_prolog_files() ->
-	{ok, FileNames} = file:list_dir("test/prolog"),
+	{ok, FileNames} = file:list_dir("../test/auto/prolog"),
 	FileNames.

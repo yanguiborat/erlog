@@ -33,7 +33,7 @@
 -include("erlog_int.hrl").
 
 %% Interface to server.
--export([start_link/1, start_link/0, execute/2]).
+-export([start_link/1, start_link/0, execute/2, prove/2, next_solution/1, consult/2, reconsult/2, halt/1]).
 
 %% Gen server callbacs.
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -57,6 +57,28 @@ start_link() ->
 start_link(Params) ->
 	gen_server:start_link(?MODULE, Params, []).
 
+%% prove(Erlog, Goal) -> {succeed,Bindings} | {ok, more} | fail.
+%% next_solution(Erlog) -> {succeed,Bindings} | fail.
+%% consult(Erlog, File) -> ok | {error,Error}.
+%% reconsult(Erlog, File) -> ok | {error,Error}.
+%% get_db(Erlog) -> {ok,Database}.
+%% set_db(Erlog, Database) -> ok.
+%% halt(Erlog) -> ok.
+%% Interface functions to server.
+prove(Pid, Goal) when is_list(Goal) -> %when goal is string, pass it to standart interface
+	gen_server:call(Pid, {execute, Goal}, infinity);
+prove(Pid, Goal) -> gen_server:call(Pid, {prove, Goal}, infinity).  %when goal is already parsed - execute it
+
+next_solution(Pid) -> gen_server:call(Pid, next, infinity).
+
+consult(Pid, File) -> gen_server:call(Pid, {consult, File}, infinity).
+
+reconsult(Pid, File) -> gen_server:call(Pid, {reconsult, File}, infinity).
+
+halt(Pid) -> gen_server:cast(Pid, halt).
+
+
+
 init([]) -> % use built in database
 	{ok, Db} = erlog_memory:start_link(erlog_ets), %default database is ets module
 	load_built_in(Db),
@@ -73,22 +95,21 @@ init(Params) -> % use custom database implementation
 	load_built_in(Db),
 	{ok, #state{db = Db, f_consulter = FileCon}}.
 
+
 handle_call({execute, Command}, _From, State = #state{state = normal}) -> %in normal mode
-	{Res, UpdateState} = case erlog_scan:tokens([], Command, 1) of
-		                     {done, Result, _Rest} -> run_command(Result, State); % command is finished, run.
-		                     {more, _} -> {{ok, more}, State} % unfinished command. Ask for ending.
-	                     end,
-	NewState = case Res of  % change state, depending on reply
-		           {_, select} -> UpdateState;
-		           _ -> UpdateState#state{state = normal}
-	           end,
+	{Res, _} = Repl = case erlog_scan:tokens([], Command, 1) of
+		                  {done, Result, _Rest} -> run_command(Result, State); % command is finished, run.
+		                  {more, _} -> {{ok, more}, State} % unfinished command. Report it and do nothing.
+	                  end,
+	NewState = change_state(Repl),
 	{reply, Res, NewState};
 handle_call({execute, Command}, _From, State) ->  %in selection solutions mode
-	{Reply, NewState} = case preprocess_command({select, Command}, State) of  % change state, depending on reply
-		                    {{_, select} = Res, UpdatedState} -> {Res, UpdatedState};
-		                    {Res, UpdatedState} -> {Res, UpdatedState#state{state = normal}}
-	                    end,
-	{reply, Reply, NewState}.
+	{Res, _} = Repl = preprocess_command({select, Command}, State),
+	NewState = change_state(Repl), % change state, depending on reply
+	{reply, Res, NewState};
+handle_call(Command, _From, State) ->  %erlog interface commands
+	{Res, NewState} = process_command(Command, State),
+	{reply, Res, NewState}.
 
 handle_cast(halt, St) ->
 	{stop, normal, St}.
@@ -104,6 +125,10 @@ code_change(_, _, St) -> {ok, St}.
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+% change state, depending on reply
+change_state({{_, select}, State}) -> State;
+change_state({_, State}) -> State#state{state = normal}.
+
 %% @private
 load_built_in(Database) ->
 	link(Database), %TODO some better solution to clean database, close it properly and free memory after erlog terminates
@@ -120,7 +145,9 @@ load_built_in(Database) ->
 %% Run scanned command
 run_command(Command, State) ->
 	case erlog_parse:parse_prolog_term(Command) of
-		{ok, halt} -> {ok, halt};
+		{ok, halt} ->
+			gen_server:cast(self(), halt),
+			{ok, State};
 		PrologCmd -> preprocess_command(PrologCmd, State)
 	end.
 
@@ -154,6 +181,18 @@ process_command(next, State = #state{state = [Vs, Cps], db = Db, f_consulter = F
 	case erlog_logic:prove_result(catch erlog_errors:fail(Cps, Db, Fcon), Vs) of
 		{Atom, Res, Args} -> {{Atom, Res}, State#state{state = Args}};
 		Other -> {Other, State}
+	end;
+process_command({consult, File}, State = #state{db = Db, f_consulter = Fun}) -> %TODO move me to {prove, {consult, File}}.
+	case erlog_file:consult(Fun, File, Db) of
+		ok -> ok;
+		{Err, Error} when Err == erlog_error; Err == error ->
+			{{error, Error}, State}
+	end;
+process_command({reconsult, File}, State = #state{db = Db, f_consulter = Fun}) -> %TODO move me to {prove, {reconsult, File}}.
+	case erlog_file:reconsult(Fun, File, Db) of
+		ok -> ok;
+		{Err, Error} when Err == erlog_error; Err == error ->
+			{{error, Error}, State}
 	end;
 process_command(halt, State) ->
 	gen_server:cast(self(), halt),

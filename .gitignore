@@ -9,3 +9,9 @@ erlog_scan.erl
 rel/erlog
 .rebar
 .eunit
+.qc/*
+scratch/*
+src/erlog_scan.erl
+deps/*
+.rebar/*
+.deps_plt

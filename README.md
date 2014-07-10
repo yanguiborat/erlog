@@ -60,4 +60,3 @@ your own function for consulting files and pass it to erlog:
 
     F = fun(Filename) -> my_hadoop_server:get_file(Filename) end,
     Proplist = [{database, dbModule}, {arguments, Params}, {f_consulter, F}],
-    erlog:start_link(Proplist).
