@@ -153,9 +153,8 @@ next(Db, Queue) ->
 db_next(Db, {Queue, _Table}) -> next(Db, Queue).
 
 get_db_procedure({StdLib, ExLib, Db}, {Collection, Goal}) ->
-  Functor = erlog_ec_support:functor(Goal),
   Dict = erlog_db_storage:get_db(dict, Collection),
-  {Res, Udict} = get_procedure({StdLib, ExLib, Dict}, Functor),
+  {Res, Udict} = get_procedure({StdLib, ExLib, Dict}, Goal),
   erlog_db_storage:update_db(Collection, Udict),
   {Res, Db}.
 
