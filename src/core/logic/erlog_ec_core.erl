@@ -12,7 +12,7 @@
 -include("erlog_core.hrl").
 
 %% API
--export([prove_body/1, prove_goal/1, prove_goal/5, prove_goal_clauses/2, run_n_close/2]).
+-export([prove_body/1, prove_goal/1, prove_goal/5, prove_goal_clauses/2, run_n_close/2, prove_goal_clause/2]).
 
 %% prove_goal(Goal, Database) -> Succeed | Fail.
 %% This is the main entry point into the interpreter. Check that
