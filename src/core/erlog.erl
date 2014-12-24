@@ -34,7 +34,7 @@
 -include("erlog_core.hrl").
 
 %% Interface to server.
--export([start_link/1, start_link/0, execute/2, select/2, execute/3, select/3]).
+-export([start_link/1, start_link/0, execute/2, select/2, execute/3, select/3, load/2]).
 
 %% Gen server callbacs.
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -48,6 +48,8 @@ select(Worker, Command, undefined) -> select(Worker, Command);
 select(Worker, Command, Timeout) -> gen_server:call(Worker, {select, trim_command(Command)}, Timeout).
 
 select(Worker, Command) -> gen_server:call(Worker, {select, trim_command(Command)}).
+
+load(Worker, Terms) -> gen_server:call(Worker, {load, Terms}).
 
 -spec start_link() -> pid().
 start_link() ->
@@ -84,7 +86,10 @@ handle_call({execute, Command}, _From, State) -> %running prolog code in normal 
 handle_call({select, Command}, _From, State) ->  %in selection solutions mode
   {Res, _} = Repl = preprocess_command({select, Command}, State),
   NewState = change_state(Repl), % change state, depending on reply
-  {reply, Res, NewState}.
+  {reply, Res, NewState};
+handle_call({load, Terms}, _From, State = #state{db_state = DbState, f_consulter = Fcon}) ->  %direct loading of terms (without parsing)
+  {ok, UdbState} = erlog_file:consult(Fcon, Terms, DbState),
+  {reply, ok, State#state{db_state = UdbState}}.
 
 handle_cast(halt, St = #state{e_man = undefined}) ->
   {stop, normal, St};

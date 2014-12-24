@@ -43,18 +43,9 @@ lookup(Directory) ->
 %% but cleaned up using try.
 -spec load(File :: string()) -> {ok, [Term :: term()]} | {error, Error :: term()}.
 load(File) ->
-  case file:open(File, [read]) of
-    {ok, Fd} ->
-      try
-        {ok, read_stream(Fd, 1)}
-      catch
-        throw:Term -> Term;
-        error:Error -> {error, {einval, Error}};
-        exit:Exit -> {exit, {einval, Exit}}
-      after
-        file:close(Fd)
-      end;
-    Error -> Error
+  case io_lib:printable_list(File) of
+    true -> parse_and_load(File); %need to parse file
+    false -> {ok, File} %do not need to parse file
   end.
 
 format_error(Params) -> format_error("Error", Params).
@@ -68,6 +59,22 @@ format_error(Type, Params) ->
   S = string:join(B, ": "),
   lists:flatten(S).
 
+
+%% @private
+parse_and_load(File) ->
+  case file:open(File, [read]) of
+    {ok, Fd} ->
+      try
+        {ok, read_stream(Fd, 1)}
+      catch
+        throw:Term -> Term;
+        error:Error -> {error, {einval, Error}};
+        exit:Exit -> {exit, {einval, Exit}}
+      after
+        file:close(Fd)
+      end;
+    Error -> Error
+  end.
 
 %% @private
 read_stream(Fd, L0) ->
