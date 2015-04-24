@@ -27,22 +27,7 @@
   close/2,
   next/2]).
 
-%% erlog db callbacks
--export([db_assertz_clause/2,
-  db_asserta_clause/2,
-  db_retract_clause/2,
-  db_abolish_clauses/2,
-  db_findall/2,
-  get_db_procedure/2,
-  db_listing/2,
-  db_next/2]).
-
 new(_) -> {ok, ets:new(eets, [bag, private])}.
-
-db_assertz_clause({StdLib, ExLib, Db}, {Collection, Head, Body0}) ->
-  Ets = erlog_db_storage:get_db(ets, Collection),
-  {Res, _} = assertz_clause({StdLib, ExLib, Ets}, {Head, Body0}),
-  {Res, Db}.
 
 assertz_clause({_, _, Db} = Memory, {Head, Body0}) ->
   clause(Head, Body0, Memory,
@@ -53,11 +38,6 @@ assertz_clause({_, _, Db} = Memory, {Head, Body0}) ->
       end
     end),
   {ok, Db}.
-
-db_asserta_clause({StdLib, ExLib, Db}, {Collection, Head, Body0}) ->
-  Ets = erlog_db_storage:get_db(ets, Collection),
-  {Res, _} = asserta_clause({StdLib, ExLib, Ets}, {Head, Body0}),
-  {Res, Db}.
 
 asserta_clause({_, _, Db} = Memory, {Head, Body0}) ->
   clause(Head, Body0, Memory,
@@ -72,11 +52,6 @@ asserta_clause({_, _, Db} = Memory, {Head, Body0}) ->
     end),
   {ok, Db}.
 
-db_retract_clause({StdLib, ExLib, Db}, {Collection, Functor, Ct}) ->
-  Ets = erlog_db_storage:get_db(ets, Collection),
-  {Res, _} = retract_clause({StdLib, ExLib, Ets}, {Functor, Ct}),
-  {Res, Db}.
-
 retract_clause({_, _, Db}, {Functor, Ct}) ->
   case catch ets:lookup_element(Db, Functor, 2) of
     Cs when is_list(Cs) ->
@@ -86,31 +61,9 @@ retract_clause({_, _, Db}, {Functor, Ct}) ->
   end,
   {ok, Db}.
 
-db_abolish_clauses({StdLib, ExLib, Db}, {Collection, Functor}) ->
-  Ets = erlog_db_storage:get_db(ets, Collection),
-  {Res, _} = abolish_clauses({StdLib, ExLib, Ets}, Functor),
-  {Res, Db}.
-
 abolish_clauses({_, _, Db}, Functor) ->
   ets:delete(Db, Functor),
   {ok, Db}.
-
-db_findall({StdLib, ExLib, Db}, {Collection, Goal}) ->  %for db_call
-  Functor = erlog_ec_support:functor(Goal),
-  Ets = erlog_db_storage:get_db(ets, Collection),
-  case dict:find(Functor, StdLib) of %search built-in first
-    {ok, StFun} -> {StFun, Db};
-    error ->
-      case dict:find(Functor, ExLib) of  %search libraryspace then
-        {ok, ExFun} -> {ExFun, Db};
-        error ->
-          CS = case catch ets:lookup_element(Ets, Functor, 2) of  %search userspace last
-                 Cs when is_list(Cs) -> Cs;
-                 _ -> []
-               end,
-          {work_with_clauses(CS), Db}
-      end
-  end.
 
 findall({StdLib, ExLib, Db}, Goal) ->
   Functor = erlog_ec_support:functor(Goal),
@@ -140,12 +93,6 @@ next(Ets, Queue) ->
       {{cursor, UQ, result, Val}, Ets};  %return it
     {empty, UQ} -> {{cursor, UQ, result, []}, Ets}  %nothing to return
   end.
-
-db_next(Db, {Queue, _Table}) -> next(Db, Queue).
-
-get_db_procedure({StdLib, ExLib, _}, {Collection, Goal}) ->
-  Ets = erlog_db_storage:get_db(ets, Collection),
-  get_procedure({StdLib, ExLib, Ets}, Goal).
 
 get_procedure({StdLib, ExLib, Db}, Goal) ->
   Functor = erlog_ec_support:functor(Goal),
@@ -185,11 +132,6 @@ get_interp_functors({_, ExLib, Db}) ->
   Res = ets:foldl(fun({Func, _}, Fs) -> [Func | Fs];
     (_, Fs) -> Fs
   end, Library, Db),
-  {Res, Db}.
-
-db_listing({StdLib, ExLib, Db}, {Collection, Params}) ->
-  Ets = erlog_db_storage:get_db(ets, Collection),
-  {Res, _} = listing({StdLib, ExLib, Ets}, {Params}),
   {Res, Db}.
 
 listing({_, _, Db}, {[Functor, Arity]}) ->

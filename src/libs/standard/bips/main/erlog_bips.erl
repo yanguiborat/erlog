@@ -116,7 +116,7 @@ prove_goal(Params = #param{goal = {var, T0}, next_goal = Next, bindings = Bs}) -
 %% Atom processing.
 prove_goal(Params = #param{goal = {atom_chars, A, L}}) ->
   erlog_eb_logic:prove_atom_chars(A, L, Params);
-prove_goal(Params = #param{goal = {atom_length, A0, L0}, bindings = Bs, database = Db}) ->
+prove_goal(Params = #param{goal = {atom_length, A0, L0}, bindings = Bs, memory = Db}) ->
   case erlog_ec_support:dderef(A0, Bs) of
     A when is_atom(A) ->
       Alen = length(atom_to_list(A)),  %No of chars in atom
@@ -131,7 +131,7 @@ prove_goal(Params = #param{goal = {atom_length, A0, L0}, bindings = Bs, database
     Other -> erlog_errors:type_error(atom, Other, Db)
   end;
 %% Arithmetic evalution and comparison.
-prove_goal(Params = #param{goal = {is, N, E0}, bindings = Bs, database = Db}) ->
+prove_goal(Params = #param{goal = {is, N, E0}, bindings = Bs, memory = Db}) ->
   E = erlog_eb_logic:eval_arith(erlog_ec_support:deref(E0, Bs), Bs, Db),
   erlog_ec_body:unify_prove_body(N, E, Params);
 prove_goal(Params = #param{goal = {'>', L, R}}) ->

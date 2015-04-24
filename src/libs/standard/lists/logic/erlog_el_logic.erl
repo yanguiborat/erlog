@@ -21,7 +21,7 @@
 
 insert(Params = #param{goal = {insert, A1, A2, A3}, next_goal = Next, bindings = Bs, choice = Cps, var_num = Vn}) ->
   FailFun = fun(LCp, LCps, LDb) ->  %TODO db not needed
-    erlog_el_logic:fail_insert(LCp, Params#param{choice = LCps, database = LDb}, A1, A2, A3)
+    erlog_el_logic:fail_insert(LCp, Params#param{choice = LCps, memory = LDb}, A1, A2, A3)
   end,
   Cp = #cp{type = compiled, data = FailFun, next = Next, bs = Bs, vn = Vn},
   erlog_ec_body:unify_prove_body(A3, [A2 | A1], Params#param{choice = [Cp | Cps]}).
@@ -85,7 +85,7 @@ reverse({reverse, A1, A2}, Params = #param{next_goal = Next0, bindings = Bs0, ch
       reverse({reverse, T, L}, Params#param{next_goal = Next1, var_num = Vn + 1});
     {_} = Var ->
       FailFun = fun(LCp, LCps, LDb) ->  %TODO db not needed
-        fail_reverse(LCp, Params#param{choice = LCps, database = LDb}, Var, A2)
+        fail_reverse(LCp, Params#param{choice = LCps, memory = LDb}, Var, A2)
       end,
       Cp = #cp{type = compiled, data = FailFun, next = Next0, bs = Bs0, vn = Vn},
       Bs1 = erlog_ec_support:add_binding(Var, [], Bs0),

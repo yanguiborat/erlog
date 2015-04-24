@@ -37,14 +37,14 @@ unify(T10, T20, Bs0) ->
 
 %% Try to unify Head and Body using Clauses which all have the same functor.
 unify_clauses(_Ch, _Cb, [], Param) -> erlog_errors:fail(Param);  %no more clauses to try
-unify_clauses(Ch, Cb, C, Param = #param{next_goal = Next, bindings = Bs0, var_num = Vn0, choice = Cps, database = Db, cursor = Cursor}) ->
+unify_clauses(Ch, Cb, C, Param = #param{next_goal = Next, bindings = Bs0, var_num = Vn0, choice = Cps, memory = Db, cursor = Cursor}) ->
   case unify_clause(Ch, Cb, C, Bs0, Vn0) of
     {succeed, Bs1, Vn1} ->
       Cp = #cp{type = clause, data = {Ch, Cb, Db, Cursor}, next = Next, bs = Bs0, vn = Vn0},
       erlog_ec_core:prove_body(Param#param{goal = Next, choice = [Cp | Cps], bindings = Bs1, var_num = Vn1});
     fail ->
       {{UCursor, Res}, UDb} = erlog_memory:next(Db, Cursor),
-      unify_clauses(Ch, Cb, Res, Param#param{cursor = UCursor, database = UDb})
+      unify_clauses(Ch, Cb, Res, Param#param{cursor = UCursor, memory = UDb})
   end.
 
 unify_clause(Ch, Cb, [C], Bs0, Vn0) -> unify_clause(Ch, Cb, C, Bs0, Vn0);

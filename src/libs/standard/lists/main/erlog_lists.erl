@@ -52,7 +52,7 @@ prove_goal(Params = #param{goal = {append, A1, L, A3}, next_goal = Next0, bindin
       erlog_ec_body:unify_prove_body(A3, [H | L1], Params#param{next_goal = Next1, var_num = Vn + 1});
     {_} = Var ->        %This can backtrack
       FailFun = fun(LCp, LCps, LDb) ->  %TODO db not needed
-        erlog_el_logic:fail_append(LCp, Params#param{choice = LCps, database = LDb}, Var, L, A3)
+        erlog_el_logic:fail_append(LCp, Params#param{choice = LCps, memory = LDb}, Var, L, A3)
       end,
       Cp = #cp{type = compiled, data = FailFun, next = Next0, bs = Bs0, vn = Vn},
       Bs1 = erlog_ec_support:add_binding(Var, [], Bs0),
@@ -65,7 +65,7 @@ prove_goal(Params = #param{goal = {delete, A, B, C}}) ->
   erlog_el_logic:insert(Params#param{goal = {insert, C, B, A}});
 prove_goal(Params = #param{goal = {member, A1, A2}, next_goal = Next, bindings = Bs, choice = Cps, var_num = Vn}) ->
   FailFun = fun(LCp, LCps, LDb) ->
-    erlog_el_logic:fail_member(LCp, Params#param{choice = LCps, database = LDb}, A1, A2)
+    erlog_el_logic:fail_member(LCp, Params#param{choice = LCps, memory = LDb}, A1, A2)
   end,
   Cp = #cp{type = compiled, data = FailFun, next = Next, bs = Bs, vn = Vn},
   T = {Vn},

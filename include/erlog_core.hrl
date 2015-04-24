@@ -38,12 +38,13 @@
   choice,
   bindings,
   var_num,
-  database, %erlog.htl db_state
+  memory, %erlog.htl db_state
   event_man,
   f_consulter :: atom(),
   debugger,
   cursor,
-  libs_dir
+  libs_dir,
+  user_data %user data
 }).
 
 -define(ERLOG_CORE,

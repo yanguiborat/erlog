@@ -21,7 +21,8 @@
 %% Core state.
 -record(state,
 {
-  db_state :: #db_state{}, %database state
+  memory :: #db_state{}, %erlog memory
+  user_data :: any(), %user data term - is passed in every function
   f_consulter :: atom(), %file consulter
   debugger :: fun(), %debugger function
   e_man :: pid(), %event manager, used for debuging and other output (not for return)

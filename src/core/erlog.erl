@@ -72,7 +72,8 @@ init(Params) -> % use custom database implementation
                  gen_event:add_handler(E, Module, Arguments),
                  E
              end,
-  {ok, #state{db_state = UdbState2, f_consulter = FileCon, e_man = EventMan, debugger = Debugger, libs_dir = LibsDir}}.
+  UserData = proplists:get_value(user_data, Params, []),
+  {ok, #state{memory = UdbState2, f_consulter = FileCon, e_man = EventMan, debugger = Debugger, libs_dir = LibsDir, user_data = UserData}}.
 
 handle_call({execute, Command}, _From, State) -> %running prolog code in normal mode
   {Res, _} = Repl = case erlog_scan:tokens([], Command, 1) of
@@ -168,10 +169,10 @@ run_command(Command, State) ->
 
 %% @private
 %% Preprocess command
-preprocess_command({ok, Command}, State = #state{f_consulter = Consulter, db_state = DbState}) when is_list(Command) ->  %TODO may be remove me?
+preprocess_command({ok, Command}, State = #state{f_consulter = Consulter, memory = DbState}) when is_list(Command) ->  %TODO may be remove me?
   case erlog_logic:reconsult_files(Command, DbState, Consulter) of
     {ok, UpdDbState} ->
-      {true, State#state{db_state = UpdDbState}};
+      {true, State#state{memory = UpdDbState}};
     {error, {L, Pm, Pe}} ->
       {erlog_io:format_error([L, Pm:format_error(Pe)]), State};
     {Error, Message} when Error == error; Error == erlog_error ->
@@ -192,10 +193,10 @@ process_command({prove, Goal}, State) ->
   prove_goal(Goal, State);
 process_command(next, State = #state{state = normal}) ->  % can't select solution, when not in select mode
   {fail, State};
-process_command(next, State = #state{state = [Vs, Cps], db_state = DbState, f_consulter = Consulter, libs_dir = LD}) ->
-  case erlog_logic:prove_result(catch erlog_errors:fail(#param{choice = Cps, database = DbState, f_consulter = Consulter, libs_dir = LD}), Vs) of
-    {Atom, Res, Args, Udb} -> {{Atom, Res}, State#state{state = Args, db_state = Udb}};
-    {fail, Db} -> {fail, State#state{db_state = Db}};
+process_command(next, State = #state{state = [Vs, Cps], memory = DbState, f_consulter = Consulter, libs_dir = LD, user_data = UD}) ->
+  case erlog_logic:prove_result(catch erlog_errors:fail(#param{choice = Cps, memory = DbState, f_consulter = Consulter, libs_dir = LD, user_data = UD}), Vs) of
+    {Atom, Res, Args, Udb} -> {{Atom, Res}, State#state{state = Args, memory = Udb}};
+    {fail, Db} -> {fail, State#state{memory = Db}};
     Other -> {Other, State}
   end;
 process_command(halt, State) ->
@@ -203,15 +204,15 @@ process_command(halt, State) ->
   {ok, State}.
 
 %% @private
-prove_goal(Goal0, State = #state{db_state = Db, f_consulter = Consulter, e_man = Event, debugger = Deb, libs_dir = LD}) ->
+prove_goal(Goal0, State = #state{memory = Db, f_consulter = Consulter, e_man = Event, debugger = Deb, libs_dir = LD, user_data = UD}) ->
   Vs = erlog_logic:vars_in(Goal0),
   %% Goal may be a list of goals, ensure proper goal.
   Goal1 = erlog_logic:unlistify(Goal0),
   %% Must use 'catch' here as 'try' does not do last-call
   %% optimisation.
-  case erlog_logic:prove_result(catch erlog_ec_core:prove_goal(Goal1, Db, Consulter, Event, Deb, LD), Vs) of
-    {succeed, Res, Args, UDbState} -> {{succeed, Res}, State#state{state = Args, db_state = UDbState}};
-    {fail, Db} -> {fail, State#state{db_state = Db}};
+  case erlog_logic:prove_result(catch erlog_ec_core:prove_goal(Goal1, Db, Consulter, Event, Deb, LD, UD), Vs) of
+    {succeed, Res, Args, UDbState} -> {{succeed, Res}, State#state{state = Args, memory = UDbState}};
+    {fail, Db} -> {fail, State#state{memory = Db}};
     OtherRes -> {OtherRes, State}
   end.
 

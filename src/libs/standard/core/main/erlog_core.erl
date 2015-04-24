@@ -45,7 +45,7 @@ load(DbState) ->
 %% Logic and control. Conjunctions are handled in prove_body and true
 %% has been compiled away.
 prove_goal(Param = #param{goal = {call, G}, next_goal = Next0, choice = Cps,
-  bindings = Bs, var_num = Vn, database = Db}) ->
+  bindings = Bs, var_num = Vn, memory = Db}) ->
   %% Only add cut CP to Cps if goal contains a cut.
   Label = Vn,
   case erlog_ec_logic:check_goal(G, Next0, Bs, Db, false, Label) of
@@ -56,7 +56,7 @@ prove_goal(Param = #param{goal = {call, G}, next_goal = Next0, choice = Cps,
     {Next1, false} -> erlog_ec_core:prove_body(Param#param{goal = Next1, var_num = Vn + 1})
   end;
 prove_goal(Params = #param{goal = fail}) -> erlog_errors:fail(Params);
-prove_goal(Param = #param{goal = {'\\+', G}, next_goal = Next0, choice = Cps, bindings = Bs, var_num = Vn, database = Db}) ->
+prove_goal(Param = #param{goal = {'\\+', G}, next_goal = Next0, choice = Cps, bindings = Bs, var_num = Vn, memory = Db}) ->
   %% We effectively implementing \+ G with ( G -> fail ; true ).
   Label = Vn,
   {Next1, _} = erlog_ec_logic:check_goal(G, [{{cut}, Label, true}, fail], Bs, Db, true, Label),
@@ -68,22 +68,22 @@ prove_goal(Param = #param{goal = repeat, next_goal = Next, choice = Cps, binding
   Cp = #cp{type = disjunction, next = [repeat | Next], bs = Bs, vn = Vn},
   erlog_ec_core:prove_body(Param#param{goal = Next, choice = [Cp | Cps]});
 %% Clause creation and destruction.
-prove_goal(Param = #param{goal = {abolish, Pi0}, next_goal = Next, bindings = Bs, database = Db}) ->
+prove_goal(Param = #param{goal = {abolish, Pi0}, next_goal = Next, bindings = Bs, memory = Db}) ->
   case erlog_ec_support:dderef(Pi0, Bs) of
     {'/', N, A} when is_atom(N), is_integer(A), A > 0 ->
       {_, UDb} = erlog_memory:abolish_clauses(Db, {N, A}),
-      erlog_ec_core:prove_body(Param#param{goal = Next, database = UDb});
+      erlog_ec_core:prove_body(Param#param{goal = Next, memory = UDb});
     Pi -> erlog_errors:type_error(predicate_indicator, Pi, Db)
   end;
-prove_goal(Param = #param{goal = {Assert, C0}, next_goal = Next, bindings = Bs, database = Db})
+prove_goal(Param = #param{goal = {Assert, C0}, next_goal = Next, bindings = Bs, memory = Db})
   when Assert == assert; Assert == assertz ->
   C = erlog_ec_support:dderef(C0, Bs),
   {_, UDb} = erlog_memory:assertz_clause(Db, C),
-  erlog_ec_core:prove_body(Param#param{goal = Next, database = UDb});
-prove_goal(Param = #param{goal = {asserta, C0}, next_goal = Next, bindings = Bs, database = Db}) ->
+  erlog_ec_core:prove_body(Param#param{goal = Next, memory = UDb});
+prove_goal(Param = #param{goal = {asserta, C0}, next_goal = Next, bindings = Bs, memory = Db}) ->
   C = erlog_ec_support:dderef(C0, Bs),
   {_, UDb} = erlog_memory:asserta_clause(Db, C),
-  erlog_ec_core:prove_body(Param#param{goal = Next, database = UDb});
+  erlog_ec_core:prove_body(Param#param{goal = Next, memory = UDb});
 prove_goal(Param = #param{goal = {retract, C0}, bindings = Bs}) ->
   C = erlog_ec_support:dderef(C0, Bs),
   erlog_ec_logic:prove_retract(C, Param);
@@ -97,18 +97,18 @@ prove_goal(Param = #param{goal = {clause, H0, B}, bindings = Bs}) ->
 prove_goal(Param = #param{goal = {current_predicate, Pi0}, bindings = Bs}) ->
   Pi = erlog_ec_support:dderef(Pi0, Bs),
   erlog_ec_logic:prove_current_predicate(Pi, Param);
-prove_goal(Param = #param{goal = {predicate_property, H0, P}, bindings = Bs, database = Db}) ->
+prove_goal(Param = #param{goal = {predicate_property, H0, P}, bindings = Bs, memory = Db}) ->
   H = erlog_ec_support:dderef(H0, Bs),
   {Res, UDb} = erlog_memory:get_procedure_type(Db, H),
   case catch Res of
-    built_in -> erlog_ec_body:unify_prove_body(P, built_in, Param#param{database = UDb});
-    compiled -> erlog_ec_body:unify_prove_body(P, compiled, Param#param{database = UDb});
-    interpreted -> erlog_ec_body:unify_prove_body(P, interpreted, Param#param{database = UDb});
-    undefined -> erlog_errors:fail(Param#param{database = UDb});
+    built_in -> erlog_ec_body:unify_prove_body(P, built_in, Param#param{memory = UDb});
+    compiled -> erlog_ec_body:unify_prove_body(P, compiled, Param#param{memory = UDb});
+    interpreted -> erlog_ec_body:unify_prove_body(P, interpreted, Param#param{memory = UDb});
+    undefined -> erlog_errors:fail(Param#param{memory = UDb});
     {erlog_error, E} -> erlog_errors:erlog_error(E, UDb)
   end;
 %% External interface
-prove_goal(Param = #param{goal = {ecall, C0, Val}, bindings = Bs, database = Db}) ->
+prove_goal(Param = #param{goal = {ecall, C0, Val}, bindings = Bs, memory = Db}) ->
   %% Build the initial call.
   %%io:fwrite("PG(ecall): ~p\n   ~p\n   ~p\n", [dderef(C0, Bs),Next,Cps]),
   Efun = case erlog_ec_support:dderef(C0, Bs) of
@@ -134,55 +134,55 @@ prove_goal(Param = #param{goal = {writeln, T}, next_goal = Next, bindings = Bs, 
   gen_event:notify(Evman, Res),
   erlog_ec_core:prove_body(Param#param{goal = Next});
 %% File utils
-prove_goal(Param = #param{goal = {consult, Name}, next_goal = Next, bindings = Bs, f_consulter = Consulter, database = Db}) ->
+prove_goal(Param = #param{goal = {consult, Name}, next_goal = Next, bindings = Bs, f_consulter = Consulter, memory = Db}) ->
   case erlog_file:consult(Consulter, erlog_ec_support:dderef(Name, Bs), Db) of
-    {ok, DbState} -> erlog_ec_core:prove_body(Param#param{goal = Next, database = DbState});
+    {ok, DbState} -> erlog_ec_core:prove_body(Param#param{goal = Next, memory = DbState});
     {Err, Error} when Err == erlog_error; Err == error ->
       erlog_errors:erlog_error(Error, Db)
   end;
-prove_goal(Param = #param{goal = {reconsult, Name}, next_goal = Next, f_consulter = Consulter, database = Db}) ->
+prove_goal(Param = #param{goal = {reconsult, Name}, next_goal = Next, f_consulter = Consulter, memory = Db}) ->
   case erlog_file:reconsult(Consulter, Name, Db) of
-    {ok, UdbState} -> erlog_ec_core:prove_body(Param#param{goal = Next, database = UdbState});
+    {ok, UdbState} -> erlog_ec_core:prove_body(Param#param{goal = Next, memory = UdbState});
     {Err, Error} when Err == erlog_error; Err == error ->
       erlog_errors:erlog_error(Error, Db)
   end;
-prove_goal(Param = #param{goal = {deconsult, Name}, next_goal = Next, f_consulter = Consulter, database = Db}) ->
+prove_goal(Param = #param{goal = {deconsult, Name}, next_goal = Next, f_consulter = Consulter, memory = Db}) ->
   case erlog_file:deconsult(Consulter, Name, Db) of
-    {ok, UDbState} -> erlog_ec_core:prove_body(Param#param{goal = Next, database = UDbState});
+    {ok, UDbState} -> erlog_ec_core:prove_body(Param#param{goal = Next, memory = UDbState});
     {Err, Error} when Err == erlog_error; Err == error ->
       erlog_errors:erlog_error(Error, Db)
   end;
-prove_goal(Param = #param{goal = {use, Library}, next_goal = Next, database = Db}) when is_atom(Library) ->
+prove_goal(Param = #param{goal = {use, Library}, next_goal = Next, memory = Db}) when is_atom(Library) ->
   try Library:load(Db) of
     Udb ->
-      erlog_ec_core:prove_body(Param#param{goal = Next, database = Udb})
+      erlog_ec_core:prove_body(Param#param{goal = Next, memory = Udb})
   catch
     _:_ -> erlog_errors:fail(Param)
   end;
-prove_goal(Param = #param{goal = {use, Library}, next_goal = Next, database = Db, f_consulter = Consulter, libs_dir = LD}) when is_list(Library) ->
+prove_goal(Param = #param{goal = {use, Library}, next_goal = Next, memory = Db, f_consulter = Consulter, libs_dir = LD}) when is_list(Library) ->
   case erlog_file:load_library(Consulter, lists:concat([LD, "/", Library]), Db) of
-    {ok, UDBState} -> erlog_ec_core:prove_body(Param#param{goal = Next, database = UDBState});
+    {ok, UDBState} -> erlog_ec_core:prove_body(Param#param{goal = Next, memory = UDBState});
     _ -> erlog_errors:fail(Param)
   end;
-prove_goal(Param = #param{goal = {listing, Res}, next_goal = Next, bindings = Bs0, database = Db}) ->
+prove_goal(Param = #param{goal = {listing, Res}, next_goal = Next, bindings = Bs0, memory = Db}) ->
   {Content, Udb} = erlog_memory:listing(Db, []),
   Bs = erlog_ec_support:add_binding(Res, Content, Bs0),
-  erlog_ec_core:prove_body(Param#param{goal = Next, bindings = Bs, database = Udb});
-prove_goal(Param = #param{goal = {listing, Pred, Res}, next_goal = Next, bindings = Bs0, database = Db}) ->
+  erlog_ec_core:prove_body(Param#param{goal = Next, bindings = Bs, memory = Udb});
+prove_goal(Param = #param{goal = {listing, Pred, Res}, next_goal = Next, bindings = Bs0, memory = Db}) ->
   {Content, Udb} = erlog_memory:listing(Db, [Pred]),
   Bs = erlog_ec_support:add_binding(Res, Content, Bs0),
-  erlog_ec_core:prove_body(Param#param{goal = Next, bindings = Bs, database = Udb});
-prove_goal(Param = #param{goal = {listing, Pred, Arity, Res}, next_goal = Next, bindings = Bs0, database = Db}) ->
+  erlog_ec_core:prove_body(Param#param{goal = Next, bindings = Bs, memory = Udb});
+prove_goal(Param = #param{goal = {listing, Pred, Arity, Res}, next_goal = Next, bindings = Bs0, memory = Db}) ->
   {Content, Udb} = erlog_memory:listing(Db, [Pred, Arity]),
   Bs = erlog_ec_support:add_binding(Res, Content, Bs0),
-  erlog_ec_core:prove_body(Param#param{goal = Next, bindings = Bs, database = Udb});
+  erlog_ec_core:prove_body(Param#param{goal = Next, bindings = Bs, memory = Udb});
 prove_goal(Param = #param{goal = {findall, T, G, B}}) ->  %findall start
   erlog_ec_logic:prove_findall(T, G, B, Param);
-prove_goal(Param = #param{goal = {findall, Tag, T0}, bindings = Bs, database = Db}) ->  %findall finish
+prove_goal(Param = #param{goal = {findall, Tag, T0}, bindings = Bs, memory = Db}) ->  %findall finish
   T1 = erlog_ec_support:dderef(T0, Bs),
   UDb = erlog_memory:raw_append(Db, Tag, T1),  %Append to saved list
-  erlog_errors:fail(Param#param{database = UDb});
-prove_goal(Param = #param{goal = {bagof, Goal, Fun, Res}, choice = Cs0, bindings = Bs0, next_goal = Next, var_num = Vn, database = Db}) ->
+  erlog_errors:fail(Param#param{memory = UDb});
+prove_goal(Param = #param{goal = {bagof, Goal, Fun, Res}, choice = Cs0, bindings = Bs0, next_goal = Next, var_num = Vn, memory = Db}) ->
   {Predicates, UDb} = erlog_memory:finadll(Db, Fun),
   FunList = tuple_to_list(Fun),
   ResultDict = erlog_ec_support:collect_alternatives(Goal, FunList, Predicates),
@@ -193,7 +193,7 @@ prove_goal(Param = #param{goal = {bagof, Goal, Fun, Res}, choice = Cs0, bindings
       UpdBs1 = erlog_ec_support:update_vars(Goal, FunList, Key, UpdBs0),
       [#cp{type = disjunction, label = Fun, next = Next, bs = UpdBs1, vn = Vn} | Acc]
     end, Cs0, Collected),
-  erlog_ec_core:prove_body(Param#param{goal = Next, bindings = UBs#cp.bs, choice = Choises, var_num = Vn + length(Choises), database = UDb});
+  erlog_ec_core:prove_body(Param#param{goal = Next, bindings = UBs#cp.bs, choice = Choises, var_num = Vn + length(Choises), memory = UDb});
 prove_goal(Param = #param{goal = {to_integer, NumV, Res}, next_goal = Next, bindings = Bs0}) ->
   Num = erlog_ec_support:dderef(NumV, Bs0),
   case catch (erlog_ec_logic:parse_int(Num)) of

@@ -35,18 +35,6 @@
   next/2,
   close/2]).
 
--export([
-  db_assertz_clause/3,
-  db_assertz_clause/4,
-  db_asserta_clause/4,
-  db_asserta_clause/3,
-  db_retract_clause/4,
-  db_abolish_clauses/3,
-  get_db_procedure/3,
-  db_findall/3,
-  db_listing/3,
-  db_next/3]).
-
 -export([load_kernel_space/3]).
 
 
@@ -84,39 +72,18 @@ asserta_clause(DBState, Head, Body) ->
   F = erlog_ec_support:functor(Head),
   do_action(DBState, asserta_clause, F, {Head, Body}).
 
-db_assertz_clause(Database, Collection, {':-', Head, Body}) -> db_assertz_clause(Database, Collection, Head, Body);
-db_assertz_clause(Database, Collection, Head) -> db_assertz_clause(Database, Collection, Head, true).
-db_assertz_clause(DBState, Collection, Head, Body) ->
-  do_action(DBState, db_assertz_clause, {Collection, Head, Body}).
-
-db_asserta_clause(Database, Collection, {':-', H, B}) -> db_asserta_clause(Database, Collection, H, B);
-db_asserta_clause(Database, Collection, H) -> db_asserta_clause(Database, Collection, H, true).
-db_asserta_clause(DBState, Collection, Head, Body) ->
-  do_action(DBState, db_asserta_clause, {Collection, Head, Body}).
-
 next(DBState, Cursor) ->
   do_next(DBState, next, Cursor).
-db_next(DBState, Cursor, Table) ->
-  do_next(DBState, db_next, {Cursor, Table}).
 
 retract_clause(DBState, F, Ct) ->
   do_action(DBState, retract_clause, F, {F, Ct}).
-
-db_retract_clause(DBState, Collection, F, Ct) ->
-  do_action(DBState, db_retract_clause, {Collection, F, Ct}).
 
 abolish_clauses(DBState = #db_state{stdlib = StdLib}, Func) ->
   check_immutable(StdLib, Func),
   check_abolish(abolish_clauses, Func, Func, DBState).
 
-db_abolish_clauses(DBState, Collection, Func) ->
-  check_abolish(db_abolish_clauses, Func, {Collection, Func}, DBState).
-
 get_procedure(DbState, Func) ->
   do_action(DbState, get_procedure, Func).
-
-get_db_procedure(DbState, Collection, Func) ->
-  do_action(DbState, get_db_procedure, {Collection, Func}).
 
 get_procedure_type(DbState, Func) ->
   do_action(DbState, get_procedure_type, Func).
@@ -124,17 +91,11 @@ get_procedure_type(DbState, Func) ->
 get_interp_functors(DbState) ->
   do_action(DbState, get_interp_functors).
 
-db_findall(DbState, Collection, Fun) ->
-  do_action(DbState, db_findall, {Collection, Fun}).
-
 finadll(DbState, Fun) ->
   do_action(DbState, findall, Fun).
 
 listing(DbState, Args) ->
   do_action(DbState, listing, Args).
-
-db_listing(DbState, Collection, Args) ->
-  do_action(DbState, db_listing, {Collection, Args}).
 
 raw_store(DBState = #db_state{in_mem = InMem}, Key, Value) ->
   Umem = store(Key, Value, InMem),

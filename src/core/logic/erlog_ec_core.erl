@@ -12,16 +12,16 @@
 -include("erlog_core.hrl").
 
 %% API
--export([prove_body/1, prove_goal/1, prove_goal/6, prove_goal_clauses/2, run_n_close/2, prove_goal_clause/2]).
+-export([prove_body/1, prove_goal/1, prove_goal/7, prove_goal_clauses/2, run_n_close/2, prove_goal_clause/2]).
 
 %% This is the main entry point into the interpreter. Check that
 %% everything is consistent then prove the goal as a call.
--spec prove_goal(Goal0 :: term(), Db :: pid(), Consuter :: atom(), Event :: pid(), Deb :: fun(), LibsDir :: string()) -> term().
-prove_goal(Goal0, Db, Consulter, Event, Deb, LibsDir) ->
+-spec prove_goal(Goal0 :: term(), Db :: pid(), Consuter :: atom(), Event :: pid(), Deb :: fun(), LibsDir :: string(), any()) -> term().
+prove_goal(Goal0, Db, Consulter, Event, Deb, LibsDir, UserData) ->
   %% Check term and build new instance of term with bindings.
   {Goal1, Bs, Vn} = erlog_ec_logic:initial_goal(Goal0),
   Params = #param{goal = [{call, Goal1}], choice = [], bindings = Bs, var_num = Vn,
-    event_man = Event, database = Db, f_consulter = Consulter, debugger = Deb, libs_dir = LibsDir},
+    event_man = Event, memory = Db, f_consulter = Consulter, debugger = Deb, libs_dir = LibsDir, user_data = UserData},
   erlog_ec_core:prove_body(Params).
 
 %% prove_body(Body, ChoicePoints, Bindings, VarNum, Database) ->
@@ -32,7 +32,7 @@ prove_goal(Goal0, Db, Consulter, Event, Deb, LibsDir) ->
 prove_body(Params = #param{goal = [G | Gs], debugger = Deb, bindings = Bs}) ->
   Deb(ok, G, Bs),
   prove_goal(Params#param{goal = G, next_goal = Gs});
-prove_body(#param{goal = [], choice = Cps, bindings = Bs, var_num = Vn, database = Db}) ->
+prove_body(#param{goal = [], choice = Cps, bindings = Bs, var_num = Vn, memory = Db}) ->
   {succeed, Cps, Bs, Vn, Db}.      %No more body
 
 %% Prove support first. Then find in database.
@@ -67,12 +67,12 @@ prove_goal(Param = #param{goal = {{disj}, R}, next_goal = Next, choice = Cps, bi
   %% There is no L here, it has already been prepended to Next.
   Cp = #cp{type = disjunction, next = R, bs = Bs, vn = Vn},
   prove_body(Param#param{goal = Next, choice = [Cp | Cps]});
-prove_goal(Param = #param{goal = G, database = Db}) ->
+prove_goal(Param = #param{goal = G, memory = Db}) ->
   case catch erlog_memory:get_procedure(Db, G) of
     {{cursor, Cursor, result, Result}, UDB} ->
       Fun = fun(Params) -> check_result(Result, Params) end,
-      run_n_close(Fun, Param#param{cursor = Cursor, database = UDB});
-    {Result, UDB} -> check_result(Result, Param#param{database = UDB})
+      run_n_close(Fun, Param#param{cursor = Cursor, memory = UDB});
+    {Result, UDB} -> check_result(Result, Param#param{memory = UDB})
   end.
 
 %% prove_goal_clauses(Goal, Clauses, Next, ChoicePoints, Bindings, VarNum, Database) ->
@@ -90,13 +90,13 @@ prove_goal_clauses([C], Params = #param{choice = Cps, var_num = Vn}) -> %for cla
     false ->
       prove_goal_clause(C, Params)
   end;
-prove_goal_clauses(C, Params = #param{goal = G, next_goal = Next, var_num = Vn, bindings = Bs, choice = Cps, database = Db, cursor = Cursor}) ->
+prove_goal_clauses(C, Params = #param{goal = G, next_goal = Next, var_num = Vn, bindings = Bs, choice = Cps, memory = Db, cursor = Cursor}) ->
   Cp = #cp{type = goal_clauses, label = Vn, data = {G, Db, Cursor}, next = Next, bs = Bs, vn = Vn},
   prove_goal_clause(C, Params#param{choice = [Cp | Cps]}).
 
 %% Run function and close cursor after that.
 -spec run_n_close(Fun :: fun(), #param{}) -> any().
-run_n_close(Fun, Params = #param{database = Db, cursor = Cursor}) ->
+run_n_close(Fun, Params = #param{memory = Db, cursor = Cursor}) ->
   try
     Fun(Params)
   after
@@ -120,4 +120,4 @@ check_result({built_in, Mod}, Param) -> Mod:prove_goal(Param);
 check_result({code, {Mod, Func}}, Param) -> Mod:Func(Param);
 check_result({clauses, Cs}, Param) -> prove_goal_clauses(Cs, Param);
 check_result(undefined, Param) -> erlog_errors:fail(Param);
-check_result({erlog_error, E}, #param{database = Db}) -> erlog_errors:erlog_error(E, Db).
+check_result({erlog_error, E}, #param{memory = Db}) -> erlog_errors:erlog_error(E, Db).

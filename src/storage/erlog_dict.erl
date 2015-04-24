@@ -27,23 +27,7 @@
   close/2,
   next/2]).
 
-%% erlog db callbacks
--export([db_assertz_clause/2,
-  db_asserta_clause/2,
-  db_retract_clause/2,
-  db_abolish_clauses/2,
-  db_findall/2,
-  get_db_procedure/2,
-  db_listing/2,
-  db_next/2]).
-
 new(_) -> {ok, dict:new()}.
-
-db_assertz_clause({StdLib, ExLib, Db}, {Collection, Head, Body0}) ->
-  Dict = erlog_db_storage:get_db(dict, Collection),
-  {Res, Udict} = assertz_clause({StdLib, ExLib, Dict}, {Head, Body0}),
-  erlog_db_storage:update_db(Collection, Udict),
-  {Res, Db}.
 
 assertz_clause({_, _, Db} = Memory, {Head, Body0}) ->
   Udb = clause(Head, Body0, Memory,
@@ -54,12 +38,6 @@ assertz_clause({_, _, Db} = Memory, {Head, Body0}) ->
       end
     end),
   {ok, Udb}.
-
-db_asserta_clause({StdLib, ExLib, Db}, {Collection, Head, Body0}) ->
-  Dict = erlog_db_storage:get_db(dict, Collection),
-  {Res, Udict} = asserta_clause({StdLib, ExLib, Dict}, {Head, Body0}),
-  erlog_db_storage:update_db(Collection, Udict),
-  {Res, Db}.
 
 asserta_clause({_, _, Db} = Memory, {Head, Body0}) ->
   Udb = clause(Head, Body0, Memory,
@@ -75,12 +53,6 @@ asserta_clause({_, _, Db} = Memory, {Head, Body0}) ->
     end),
   {ok, Udb}.
 
-db_retract_clause({StdLib, ExLib, Db}, {Collection, Functor, Ct}) ->
-  Dict = erlog_db_storage:get_db(dict, Collection),
-  {Res, Udict} = retract_clause({StdLib, ExLib, Dict}, {Functor, Ct}),
-  erlog_db_storage:update_db(Collection, Udict),
-  {Res, Db}.
-
 retract_clause({_, _, Db}, {Functor, Ct}) ->
   Udb = case dict:is_key(Functor, Db) of
           true ->
@@ -89,36 +61,12 @@ retract_clause({_, _, Db}, {Functor, Ct}) ->
         end,
   {ok, Udb}.
 
-db_abolish_clauses({StdLib, ExLib, Db}, {Collection, Functor}) ->
-  Dict = erlog_db_storage:get_db(dict, Collection),
-  {Res, Udict} = abolish_clauses({StdLib, ExLib, Dict}, Functor),
-  erlog_db_storage:update_db(Collection, Udict),
-  {Res, Db}.
-
 abolish_clauses({_, _, Db}, Functor) ->
   Udb = case dict:is_key(Functor, Db) of
           true -> dict:erase(Functor, Db);
           false -> Db        %Do nothing
         end,
   {ok, Udb}.
-
-db_findall({StdLib, ExLib, Db}, {Collection, Goal}) ->  %for db_call
-  Functor = erlog_ec_support:functor(Goal),
-  Dict = erlog_db_storage:get_db(dict, Collection),
-  case dict:find(Functor, StdLib) of %search built-in first
-    {ok, StFun} -> {StFun, Db};
-    error ->
-      case dict:find(Functor, ExLib) of  %search libraryspace then
-        {ok, ExFun} -> {ExFun, Db};
-        error ->
-          case dict:find(Functor, Dict) of  %search userspace last
-            {ok, Cs} ->
-              Res = work_with_clauses(Cs), %TODO fix bagof, possibly broken by return format
-              {Res, Db};
-            error -> {[], Db}
-          end
-      end
-  end.
 
 findall({StdLib, ExLib, Db}, Goal) ->  %for bagof
   Functor = erlog_ec_support:functor(Goal),
@@ -144,14 +92,6 @@ next(Db, Queue) ->
       {{cursor, UQ, result, Val}, Db};  %return it
     {empty, UQ} -> {{cursor, UQ, result, []}, Db}  %nothing to return
   end.
-
-db_next(Db, {Queue, _Table}) -> next(Db, Queue).
-
-get_db_procedure({StdLib, ExLib, Db}, {Collection, Goal}) ->
-  Dict = erlog_db_storage:get_db(dict, Collection),
-  {Res, Udict} = get_procedure({StdLib, ExLib, Dict}, Goal),
-  erlog_db_storage:update_db(Collection, Udict),
-  {Res, Db}.
 
 get_procedure({StdLib, ExLib, Db}, Goal) ->
   Functor = erlog_ec_support:functor(Goal),
@@ -192,12 +132,6 @@ get_interp_functors({_, ExLib, Db}) ->
   Library = dict:fetch_keys(ExLib),
   UserSpace = dict:fetch_keys(Db),
   {lists:concat([Library, UserSpace]), Db}.
-
-db_listing({StdLib, ExLib, Db}, {Collection, Params}) ->
-  Dict = erlog_db_storage:get_db(dict, Collection),
-  {Res, Udict} = listing({StdLib, ExLib, Dict}, Params),
-  erlog_db_storage:update_db(Collection, Udict),
-  {Res, Db}.
 
 listing({_, _, Db}, [Functor, Arity]) ->
   {dict:fold(

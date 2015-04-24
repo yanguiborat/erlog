@@ -29,19 +29,19 @@ term_test_prove_body(Test, L, R, Params = #param{next_goal = Next, bindings = Bs
 
 %% prove_arg(Index, Term, Arg, Next, ChoicePoints, VarNum, Database) -> void.
 %%  Prove the goal arg(I, Ct, Arg), Index and Term have been dereferenced.
-prove_arg(I, [H | T], A, Param = #param{database = Db}) when is_integer(I) ->
+prove_arg(I, [H | T], A, Param = #param{memory = Db}) when is_integer(I) ->
 	if
 		I == 1 -> erlog_ec_body:unify_prove_body(H, A, Param);
 		I == 2 -> erlog_ec_body:unify_prove_body(T, A, Param);
 		true -> {fail, Db}
 	end;
-prove_arg(I, Ct, A, Param = #param{database = Db})
+prove_arg(I, Ct, A, Param = #param{memory = Db})
 	when is_integer(I), tuple_size(Ct) >= 2 ->
 	if I > 1, I + 1 =< tuple_size(Ct) ->
 		erlog_ec_body:unify_prove_body(element(I + 1, Ct), A, Param);
 		true -> {fail, Db}
 	end;
-prove_arg(I, Ct, _, #param{database = Db}) ->
+prove_arg(I, Ct, _, #param{memory = Db}) ->
 	%%Type failure just generates an error.
 	if not(is_integer(I)) -> erlog_errors:type_error(integer, I, Db);
 		true -> erlog_errors:type_error(compound, Ct, Db)
@@ -56,7 +56,7 @@ prove_functor(T, F, A, Params) when ?IS_ATOMIC(T) ->
 prove_functor([_ | _], F, A, Params) ->
 	%% Just the top level here.
 	erlog_ec_body:unify_prove_body(F, '.', A, 2, Params);
-prove_functor({_} = Var, F0, A0, Params = #param{next_goal = Next, bindings = Bs0, var_num = Vn0, database = Db}) ->
+prove_functor({_} = Var, F0, A0, Params = #param{next_goal = Next, bindings = Bs0, var_num = Vn0, memory = Db}) ->
 	case {erlog_ec_support:dderef(F0, Bs0), erlog_ec_support:dderef(A0, Bs0)} of
 		{'.', 2} ->        %He, he, he!
 			Bs1 = erlog_ec_support:add_binding(Var, [{Vn0} | {Vn0 + 1}], Bs0),
@@ -83,7 +83,7 @@ prove_univ(T, L, Params) when ?IS_ATOMIC(T) ->
 	erlog_ec_body:unify_prove_body([T], L, Params);
 prove_univ([Lh | Lt], L, Params) ->
 	erlog_ec_body:unify_prove_body(['.', Lh, Lt], L, Params);
-prove_univ({_} = Var, L, Params = #param{next_goal = Next, bindings = Bs0, database = Db}) ->
+prove_univ({_} = Var, L, Params = #param{next_goal = Next, bindings = Bs0, memory = Db}) ->
 	Bs1 = case erlog_ec_support:dderef(L, Bs0) of
 		      ['.', Lh, Lt] ->        %He, he, he!
 			      erlog_ec_support:add_binding(Var, [Lh | Lt], Bs0);
@@ -101,7 +101,7 @@ prove_univ({_} = Var, L, Params = #param{next_goal = Next, bindings = Bs0, datab
 %% prove_atom_chars(Atom, List, Next, ChoicePoints, Bindings, VarNum, Database) ->
 %%	void.
 %%  Prove the atom_chars(Atom, List).
-prove_atom_chars(A, L, Params = #param{bindings = Bs, database = Db}) ->
+prove_atom_chars(A, L, Params = #param{bindings = Bs, memory = Db}) ->
 	%% After a suggestion by Sean Cribbs.
 	case erlog_ec_support:dderef(A, Bs) of
 		Atom when is_atom(Atom) ->
@@ -130,7 +130,7 @@ prove_atom_chars(A, L, Params = #param{bindings = Bs, database = Db}) ->
 
 %% arith_test_prove_body(Test, Left, Right, Next, ChoicePoints, Bindings, VarNum, Database) ->
 %%	void.
-arith_test_prove_body(Test, L, R, Params = #param{next_goal = Next, bindings = Bs, database = Db}) ->
+arith_test_prove_body(Test, L, R, Params = #param{next_goal = Next, bindings = Bs, memory = Db}) ->
 	case erlang:Test(eval_arith(erlog_ec_support:deref(L, Bs), Bs, Db),
 		eval_arith(erlog_ec_support:deref(R, Bs), Bs, Db)) of
 		true -> erlog_ec_core:prove_body(Params#param{goal = Next});
