@@ -20,7 +20,7 @@
 
 -include("erlog.hrl").
 
--export([consult/3, reconsult/3, deconsult/3, load_library/3]).
+-export([consult/4, reconsult/3, deconsult/3, load_library/3]).
 
 
 %% consult(File, Database) ->
@@ -29,9 +29,9 @@
 %%	{ok,NewDatabase} | {error,Error} | {erlog_error,Error}.
 %% Load/reload an Erlog file into the interpreter. Reloading will
 %% abolish old definitons of clauses.
--spec consult(atom(), File :: string(), DbState :: #db_state{}) -> {ok, #db_state{}}.
-consult(Consulter, File, DbState) ->
-  case Consulter:load(File) of %call erlog_file_consulter implementation
+-spec consult(atom(), File :: string(), DbState :: #db_state{}, UserData :: any()) -> {ok, #db_state{}}.
+consult(Consulter, File, DbState, UserData) ->
+  case Consulter:load(File, UserData) of %call erlog_file_consulter implementation
     {ok, Terms} -> iterate_terms(fun consult_assert/2, DbState, Terms);
     Error -> Error
   end.

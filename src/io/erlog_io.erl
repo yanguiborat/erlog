@@ -30,7 +30,7 @@
 
 -behaviour(erlog_file_consulter).
 
--export([format_error/1, format_error/2, lookup/1, load/1]).
+-export([format_error/1, format_error/2, lookup/1, load/2]).
 
 -spec lookup(Directory :: string()) -> list().
 lookup(Directory) ->
@@ -41,8 +41,8 @@ lookup(Directory) ->
 
 %% Read a file containing Prolog terms. This has been taken from 'io'
 %% but cleaned up using try.
--spec load(File :: string()) -> {ok, [Term :: term()]} | {error, Error :: term()}.
-load(File) ->
+-spec load(File :: string(), any()) -> {ok, [Term :: term()]} | {error, Error :: term()}.
+load(File, _) ->
   case file:open(File, [read]) of
     {ok, Fd} ->
       try
