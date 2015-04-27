@@ -59,8 +59,9 @@ start_link(Params) ->
   gen_server:start_link(?MODULE, Params, []).
 
 init(Params) -> % use custom database implementation
+  UserData = proplists:get_value(user_data, Params, []),
   FileCon = init_consulter(Params),
-  DbState = init_database(Params),
+  DbState = init_database(Params, UserData),
   LibsDir = proplists:get_value(libs_dir, Params, "../lib"), %default assumes erlog is run from ebin
   UdbState1 = load_prolog_libraries(FileCon, LibsDir, DbState),
   UdbState2 = load_external_libraries(Params, FileCon, UdbState1),
@@ -72,7 +73,6 @@ init(Params) -> % use custom database implementation
                  gen_event:add_handler(E, Module, Arguments),
                  E
              end,
-  UserData = proplists:get_value(user_data, Params, []),
   {ok, #state{memory = UdbState2, f_consulter = FileCon, e_man = EventMan, debugger = Debugger, libs_dir = LibsDir, user_data = UserData}}.
 
 handle_call({execute, Command}, _From, State) -> %running prolog code in normal mode
@@ -111,11 +111,10 @@ change_state({_, State}) -> State#state{state = normal}.
 
 %% @private
 %% Configurates database with arguments, populates it and returns.
--spec init_database(Params :: proplists:proplist()) -> #db_state{}.
-init_database(Params) ->
+-spec init_database(Params :: proplists:proplist(), any()) -> #db_state{}.
+init_database(Params, UserData) ->
   Database = proplists:get_value(database, Params, erlog_dict), %default database is dict module
-  Args = proplists:get_value(arguments, Params, []),
-  {ok, State} = Database:new(Args), %create db and return its state
+  {ok, State} = Database:new(UserData), %create db and return its state
   D = dict:new(), %create memory cores
   DBState = #db_state{stdlib = D, exlib = D, in_mem = D, database = Database, state = State},
   load_built_in(DBState). %populate memory cores

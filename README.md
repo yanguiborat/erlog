@@ -77,7 +77,7 @@ Example:
     erlog:start_link(ConfList).
 You can pass your parameters to your database implementation:
 
-    ConfList = [{database, dbModule}, {arguments, Params}],
+    ConfList = [{database, dbModule}, {user_data, Params}],
     erlog:start_link(ConfList).
 Where `Params` is a list of your args, need to be passed to `dbModule:new/1` function.
 
