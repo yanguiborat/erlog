@@ -39,8 +39,12 @@
 %% Gen server callbacs.
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
+
 execute(Worker, Command, undefined) -> execute(Worker, Command);
 execute(Worker, Command, Timeout) -> gen_server:call(Worker, {execute, trim_command(Command)}, Timeout).
+
+execute(Worker, {erl_term, ErlCommand}) ->
+  gen_server:call(Worker, {execute, {erl_term, ErlCommand}});
 
 execute(Worker, Command) -> gen_server:call(Worker, {execute, trim_command(Command)}).
 
@@ -74,13 +78,24 @@ init(Params) -> % use custom database implementation
              end,
   {ok, #state{db_state = UdbState2, f_consulter = FileCon, e_man = EventMan, debugger = Debugger, libs_dir = LibsDir}}.
 
-handle_call({execute, Command}, _From, State) -> %running prolog code in normal mode
+
+handle_call({execute, {erl_term, ErlCommand}}, _From, State) -> %running prolog code in erlang mode
+  {Res, _} = Repl = prove_goal(ErlCommand, State),
+  NewState = change_state(Repl), % change state, depending on reply
+  {reply, Res, NewState};
+
+
+handle_call({execute, Command}, _From, State) -> %running prolog code in prolog mode
   {Res, _} = Repl = case erlog_scan:tokens([], Command, 1) of
-                      {done, Result, _Rest} -> run_command(Result, State); % command is finished, run.
+                      {done, Result, _Rest} ->
+                        lager:info("Running Command :~p",[Result]),
+                        run_command(Result, State); % command is finished, run.
                       {more, _} -> {{ok, more}, State} % unfinished command. Report it and do nothing.
                     end,
   NewState = change_state(Repl),
   {reply, Res, NewState};
+
+
 handle_call({select, Command}, _From, State) ->  %in selection solutions mode
   {Res, _} = Repl = preprocess_command({select, Command}, State),
   NewState = change_state(Repl), % change state, depending on reply
